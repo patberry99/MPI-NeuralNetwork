@@ -1,0 +1,50 @@
+PROJECT 4: Zach Hegemann and Patrick Berry 
+
+Project4.x executable will be created when running the make command. After completing the optimizations, we fully tested our NN and the outputs are showing the same high accuracy as in previous projects.
+
+After completing the optimizations in Project 4, we fully tested the neural network. The network still trains efficiently and will converge. 
+
+To test the performance improvement, we executed our neural network for 1,000 iterations and recorded the time in milliseconds. We used Linprog1 to run our code because the number of users are reduced compared to other Linprog servers. We took the average of 5 executions of project 1 / part 2 , project 2, project 3, and project 4:
+
+Average Execution Time of Project 4: 
+
+Average Execution Time of Project 1, Part 2:
+(14749 + 14754 + 14934 + 14830 + 14725) / 5 = 14798 ~14.8 seconds 
+
+Average Execution Time of Project 2:
+(11732 + 11645 + 11738 + 11727 + 11765) / 5 = 11721 ~11.7 seconds 
+
+Average Execution Time of Project 3 without NUMA tuning: ~ 9.5 seconds 
+
+Average Execution Time of Project 3 with NUMA Tuning: ~ 8.8 seconds 
+Parameter Environment Varaibles Set: Places= threads and Bind = close 
+
+
+PROJECT 1 REMINDERS
+
+STEPS BEFORE EXECUTION
+1) In the local directory that holds Proj1.cpp, run the following command to extract dataset files:
+        wget https://data.deepai.org/mnist.zip 
+2) The files will be zipped. Utilize the unzip command. 
+3) The files will be compressed via GZ extension. Run the gzip command with the -d flag for each .gz file.
+4) To compile the source code file, run the make command. The makefile creates the executable.
+
+STEPS DURING EXECUTION
+1) The executable should be run inside the nohup utility to avoid a SIGKILL to the process 
+2) There is one optional command line argument if the user wants to specify the amount of iteration. Otherwise, the NN will execute up to 100mil times. 
+3) Shortly after execution, the user will decide if they want to train the NN with 4 or 10 digits.
+
+
+OUTPUT OF EXECUTION
+1) The Output.txt file will be created and new data will continuously append to this file as the NN keeps training. Every 1,000th iteration gets appended.
+This file will output the Iteration Number, Error Value, The correct value of the current digit, and the set of outputs of the NN from [-1.716 : 1.716]
+2) The weights.txt file will be created and data will be replaced at each 1,000th iteration. 
+The file will hold all the current weights. This file could be used for the testing dataset once training is complete. 
+
+RESULTS OF TRAINING 
+1) Results of training 4 digits: After 16 hours of training, the NN was performing at an average error rate <.0001 and safe to say at 95% accuracy. 
+The amount of iterations in output.txt was not accurate as the other 6 digits counted as an iteration but were not processed in the network. 
+2) Results of training 10 digits:  After about 28 hours of training, the NN was almost at 5 million iterations. 
+The error rate on average was low with only a few outlier results. We can safely claim that this training hit a 90% accuracy. 
+
+
