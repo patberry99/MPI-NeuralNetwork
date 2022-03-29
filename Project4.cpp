@@ -9,8 +9,9 @@
 #include<time.h>
 #include<stdio.h>
 #include <unistd.h>
-#include <emmintrin.h> /* SSE2 */
-//TO COMPILE, add the flag -msse2
+//#include <emmintrin.h> /* SSE2 */
+#include "mpi.h"
+
 
 using namespace std;
 
@@ -19,32 +20,7 @@ using namespace std;
 #define N2  500
 #define N3 10
 
-
-//TIME RECORDS 
-/////////////////////////////////////////////
-// unsigned long long int t1, t2, t3;
-struct timespec b, e;
 struct timeval t1, t2;
-
-typedef unsigned long long ticks;
-
-static __inline__ ticks getticks(void)
-{
-     unsigned a, d;
-     asm("cpuid");
-     asm volatile("rdtsc" : "=a" (a), "=d" (d));
-
-     return (((ticks)a) | (((ticks)d) << 32));
-}
-
-void print_duration(struct timespec *b, struct timespec *c)
-{
-	long long r = c->tv_nsec - b->tv_nsec;
-        r += ((long long)(c->tv_sec - b->tv_sec) ) * 1000000000;
-	printf("duration = %lld nanoseconds\n", r);
-}
-/////////////////////////////////////////////////////////
-
 
 double IN[N0]; //Input Layer
 double W0[N0][N1]; //Weights of Inputs -> Hidden Layer
@@ -350,8 +326,7 @@ void train(int iter)
     string response;
     cout << "Train 10 or 4 Digits?" <<endl;
     cin >> response;
-    //clock_gettime(CLOCK_THREAD_CPUTIME_ID, &b); 
-    gettimeofday(&t1, NULL);
+       gettimeofday(&t1, NULL);
 	for (int i = 0; i< iter; i++) {
 		int ii = i % 60000;
         ParseLabelVector(ii);
@@ -363,7 +338,7 @@ void train(int iter)
        // PrintMatrixImage(); 
        // }
         ActivateInput(); //Fully Tested
-    
+
 		forward(PixelInputActivated);
      //   for(int i=0; i <N3; i++){
        //     cout << OO[i] <<endl;
@@ -373,6 +348,7 @@ void train(int iter)
         //   cout << " " <<Y[i]<<endl;
        //}
 		backward(OO, Y);
+        
 
 	/*if (i > 100 & (i % 100 == 0)){
 			cout << "Iter " << i << ": err =" << err << "\n";
@@ -386,13 +362,12 @@ void train(int iter)
             
             }
 	}
-      //clock_gettime(CLOCK_THREAD_CPUTIME_ID, &e);  
-      gettimeofday(&t2, NULL);
+        gettimeofday(&t2, NULL);
       printf("NN time is %d milliseconds\n",
 	       (t2.tv_sec - t1.tv_sec)*1000 + 
 	       (t2.tv_usec - t1.tv_usec) / 1000);
 
-     // print_duration(&b, &e);
+
 }
 
 void PopulateY(){
@@ -404,99 +379,35 @@ if (i== CorrectLabelInput){
     }
 }
 void forward(double *input){
-     double hold [2];
-    __m128d v_hold;
-    v_hold = _mm_load_pd(hold);
- for (int i = 0; i<N0; i++)
- { 
-		IN[i] = input[i];
- }    
- for (int i = 0; i < N1; i++)
- {
-     HS1[i] = B1[i];
- }
-
- // Locality Optimization Here
-   __m128d *v_IN = (__m128d *)IN;
- for (int i = 0; i < N0; i++)
- {
-     __m128d *v_HS1 = (__m128d *)HS1;
-      __m128d *v_W0 = (__m128d *)W0[i];
-     for (int j = 0; j < N1; j += 10)
-     {
-         // HS1[j] += IN[i] * W0[i][j];
-         v_hold = _mm_mul_pd(*v_IN, *v_W0);
-         *v_HS1 = _mm_add_pd(v_hold, *v_HS1);
-         v_HS1++; v_W0++;
-           v_hold = _mm_mul_pd(*v_IN, *v_W0);
-         *v_HS1 = _mm_add_pd(v_hold, *v_HS1);
-         v_HS1++; v_W0++;
-           v_hold = _mm_mul_pd(*v_IN, *v_W0);
-         *v_HS1 = _mm_add_pd(v_hold, *v_HS1);
-         v_HS1++; v_W0++;
-           v_hold = _mm_mul_pd(*v_IN, *v_W0);
-         *v_HS1 = _mm_add_pd(v_hold, *v_HS1);
-         v_HS1++; v_W0++;
-           v_hold = _mm_mul_pd(*v_IN, *v_W0);
-         *v_HS1 = _mm_add_pd(v_hold, *v_HS1);
-         v_HS1++; v_W0++;
-     }
-     v_IN++;
- }
-for (int i=0; i<N1; i+=5)
-{
-    HO1[i] = alpha(HS1[i]);
-    HO1[i+1] = alpha(HS1[i+1]);
-    HO1[i+2] = alpha(HS1[i+2]);
-    HO1[i+3] = alpha(HS1[i+3]);
-    HO1[i+4] = alpha(HS1[i+4]);
-}
+ for (int i = 0; i<N0; i++){ 
+		IN[i] = input[i];}
+    for (int i=0; i<N1; i++) {
+		HS1[i] = B1[i];
+	}
+        for (int i=0; i<N1; i++) {
+		for (int j=0; j<N0; j++)
+			HS1[i] += IN[j]*W0[j][i];
+	}
+      for (int i=0; i<N1; i++) {
+		HO1[i] = alpha(HS1[i]);
+	}
       for(int i=0; i<N2;i++){
           HS2[i] = B2[i];
       }
-
-// Locality Optimization Here
-   __m128d *v_HS1 = (__m128d *)HS1;
-for (int i = 0; i < N1; i++) 
-{
-    __m128d *v_HS2 = (__m128d *)HS2;
-      __m128d *v_W1 = (__m128d *)W1[i];
-    for (int j = 0; j < N2; j += 10) 
-    {
-      //  HS2[j] += HS1[i] * W1[i][j];
-       v_hold = _mm_mul_pd(*v_HS1, *v_W1);
-         *v_HS2 = _mm_add_pd(v_hold, *v_HS2);
-         v_HS2++; v_W1++;
-           v_hold = _mm_mul_pd(*v_HS1, *v_W1);
-         *v_HS2 = _mm_add_pd(v_hold, *v_HS2);
-         v_HS2++; v_W1++;
-           v_hold = _mm_mul_pd(*v_HS1, *v_W1);
-         *v_HS2 = _mm_add_pd(v_hold, *v_HS2);
-         v_HS2++; v_W1++;
-           v_hold = _mm_mul_pd(*v_HS1, *v_W1);
-         *v_HS2 = _mm_add_pd(v_hold, *v_HS2);
-         v_HS2++; v_W1++;
-           v_hold = _mm_mul_pd(*v_HS1, *v_W1);
-         *v_HS2 = _mm_add_pd(v_hold, *v_HS2);
-         v_HS2++; v_W1++;
-    }
-    v_HS1++;
-}
+      for (int i=0; i<N2; i++) {
+		for (int j=0; j<N1; j++)
+			HS2[i] += HS1[j]*W1[j][i];
+	}
      for (int i=0; i<N2; i++) {
 		HO2[i] = alpha(HS2[i]);
 	}
     for(int i=0; i<N3;i++){
           OS[i] = B3[i];
       }
-
-    // Locality Optimization Here
-    for (int i = 0; i < N2; i++) 
-    {
-        for (int j = 0; j < N3; j++)
-        {
-            OS[j] += HS2[i] * W2[i][j];
-        }
-    }
+    for (int i=0; i<N3; i++) {
+		for (int j=0; j<N2; j++)
+			OS[i] += HS2[j]*W2[j][i];
+	}
     for (int i=0; i<N2; i++) {
 		OO[i] = alpha(OS[i]);
 	}
@@ -522,28 +433,28 @@ double dE_B1[N1];
 double dE_W0[N0][N1];
 
 
-
-
-
-
 double backward(double *O, double *Y){
-
-  double ratehold[2];
-  ratehold[0] = ratehold[1] = rate;
-  __m128d v_ratehold = _mm_load_pd(ratehold);
-
-     err = 0.0;
-	for (int i = 0; i < N3; i++){
+    err = 0.0;
+	for (int i = 0; i < N3; i++)
 		err += (O[i] - Y[i]) * (O[i] - Y[i]);
-    }
 	err = err / N3;
 
-	for (int i = 0; i < N3; i++){
+	// compute dE_OO
+	for (int i = 0; i < N3; i++)
 		dE_OO[i] = (O[i] - Y[i]) * 2.0 / N3;
-        	dOO_OS[i] = dAlpha(OS[i]);
-            dE_OS[i] = dE_OO[i] * dOO_OS[i];
-            	dE_B3[i] = dE_OS[i];
-    }
+
+	// compute dOO_OS = dAlpha(OS) = AB / cosh^2(B * OS)
+	// alpha is our activation function and dAlpha is the derivative of alpha
+	for (int i = 0; i < N3; i++)
+		dOO_OS[i] = dAlpha(OS[i]);
+
+	// compute dE_OS = dE_OO dot dOO_OS
+	for (int i = 0; i < N3; i++)
+		dE_OS[i] = dE_OO[i] * dOO_OS[i];
+
+	// compute dE_B3 = dE_OS
+	for (int i = 0; i < N3; i++)
+		dE_B3[i] = dE_OS[i];
 
 	// compute dE_W2
 	for (int i = 0; i < N2; i++)
@@ -558,223 +469,61 @@ double backward(double *O, double *Y){
 	}
 	// compute dOO_OS = dAlpha(OS) = AB / cosh^2(B * OS)
 	// compute dHO2_HS2 = dAlpha(HS2) = AB / cosh^2(B * HS2)
-	for (int i = 0; i < N2; i++){
+	for (int i = 0; i < N2; i++)
 		dHO2_HS2[i] = dAlpha(HS2[i]);
-        dE_HS2[i] = dE_HO2[i] * dHO2_HS2[i];
-        dE_B2[i] = dE_HS2[i];
-    }
+
+	// compute dE_HS2 = dE_HO2 dot dHO2_HS2
+	for (int i = 0; i < N2; i++)
+		dE_HS2[i] = dE_HO2[i] * dHO2_HS2[i];
+
+	// compute dE_B2 = dE_HS2
+	for (int i = 0; i < N2; i++)
+		dE_B2[i] = dE_HS2[i];
 
 	// compute dE_W1
-	for (int i = 0; i < N1; i+=20) {
-         __m128d *v_dE_HS2 = (__m128d *)dE_HS2;
-		for (int j = 0; j < N2; j+=20){
-            for(int ii=i; ii<(i+20); ii++){
-                 __m128d *v_dE_W1 = (__m128d *)dE_W1[ii];
-                  double hold [2];
-                 hold[0] = hold[1] = HO1[ii];
-                __m128d v_hold;
-                v_hold = _mm_load_pd(hold);
-                for(int jj=j; jj<(j+20); jj++){
-			       // dE_W1[ii][jj] = dE_HS2[jj] * HO1[ii];
-                     *v_dE_W1 = _mm_mul_pd(v_hold, *v_dE_HS2);
-                    v_dE_W1++; v_dE_HS2++;
-               }
-            }
-        }
-	}
-	
+	for (int i = 0; i < N1; i++)
+		for (int j = 0; j < N2; j++)
+			dE_W1[i][j] = dE_HS2[j] * HO1[i];
+
+	// compute dH01_HS1
+	for (int i = 0; i < N1; i++)
+		dHO1_HS1[i] = dAlpha(HS1[i]);
+
 	// compute dE_HO1 = sum_{j = 1}^N2 dE_HS2 * W1_ij
-       __m128d *v1_dE_HO1 = (__m128d *)dE_HO1;
 	for (int i = 0; i < N1; i++) {
-         __m128d *v_W1 = (__m128d *)W1[i];
-         __m128d *v_dE_HS2 = (__m128d *)dE_HS2;
-		for (int j = 0; j < N2; j+=10){
-			//dE_HO1[i] = dE_HS2[j] * W1[i][j];
-             *v1_dE_HO1 = _mm_mul_pd(*v_dE_HS2, *v_W1);
-             v_W1++; v_dE_HS2++;
-             *v1_dE_HO1 = _mm_mul_pd(*v_dE_HS2, *v_W1);
-             v_W1++; v_dE_HS2++;
-             *v1_dE_HO1 = _mm_mul_pd(*v_dE_HS2, *v_W1);
-             v_W1++; v_dE_HS2++;
-             *v1_dE_HO1 = _mm_mul_pd(*v_dE_HS2, *v_W1);
-             v_W1++; v_dE_HS2++;
-             *v1_dE_HO1 = _mm_mul_pd(*v_dE_HS2, *v_W1);
-             v_W1++; v_dE_HS2++;
-        }
-        v1_dE_HO1++;
+		dE_HO1[i] = 0;
+		for (int j = 0; j < N2; j++)
+			dE_HO1[i] += dE_HS2[j] * W1[i][j];
 	}
 
 	// compute dE_HS1 = dE_HO1 dot dHO1_HS1
+	for (int i = 0; i < N1; i++)
+		dE_HS1[i] = dE_HO1[i] * dHO1_HS1[i];
 
-	for (int i = 0; i < N1; i++){
-        dHO1_HS1[i] = dAlpha(HS1[i]);}
+	// compute dE_B1 = dE_HS1
+	for (int i = 0; i < N1; i++)
+		dE_B1[i] = dE_HS1[i];
 
-        //SSE Optimize Below 
-        //dE_HS1[i] = dE_HO1[i] * dHO1_HS1[i];
-        //This one is good 
-          __m128d *v_dE_HO1 = (__m128d *)dE_HO1;
-         __m128d *v_dHO1_HS1 = (__m128d *)dHO1_HS1;
-         __m128d *v_dE_HS1 = (__m128d *)dE_HS1;
-          for (int i = 0; i < N1; i+=10){
-            *v_dE_HS1= _mm_mul_pd(*v_dE_HO1, *v_dHO1_HS1);
-            v_dHO1_HS1++;
-            v_dE_HO1++;
-            v_dE_HS1++;
-             *v_dE_HS1= _mm_mul_pd(*v_dE_HO1, *v_dHO1_HS1);
-            v_dHO1_HS1++;
-            v_dE_HO1++;
-            v_dE_HS1++;
-             *v_dE_HS1= _mm_mul_pd(*v_dE_HO1, *v_dHO1_HS1);
-            v_dHO1_HS1++;
-            v_dE_HO1++;
-            v_dE_HS1++;
-             *v_dE_HS1= _mm_mul_pd(*v_dE_HO1, *v_dHO1_HS1);
-            v_dHO1_HS1++;
-            v_dE_HO1++;
-            v_dE_HS1++;
-             *v_dE_HS1= _mm_mul_pd(*v_dE_HO1, *v_dHO1_HS1);
-            v_dHO1_HS1++;
-            v_dE_HO1++;
-            v_dE_HS1++;
-          }
+	// compute dE_W0
+	for (int i = 0; i < N0; i++)
+		for (int j = 0; j < N1; j++)
+			dE_W0[i][j] = dE_HS1[j] * IN[i];
 
-         for (int i = 0; i < N1; i++){
-        dE_B1[i] = dE_HS1[i];
-    }
-
- 
-for (int i = 0; i < N0; i++){
-    		//	dE_W0[i][j] = dE_HS1[j] * IN[i];
-     double hold [2];
-     hold[0] = hold[1] = IN[i];
-       __m128d v_hold;
-       v_hold = _mm_load_pd(hold);
-     __m128d *v_dE_W0 = (__m128d *)dE_W0[i];
-      __m128d *v_dE_HS1 = (__m128d *)dE_HS1;
-		for (int j = 0; j < N1; j+=10){
-                *v_dE_W0 = _mm_mul_pd(v_hold, *v_dE_HS1);
-                v_dE_W0++; v_dE_HS1++;
-                 *v_dE_W0 = _mm_mul_pd(v_hold, *v_dE_HS1);
-                v_dE_W0++; v_dE_HS1++;
-                 *v_dE_W0 = _mm_mul_pd(v_hold, *v_dE_HS1);
-                v_dE_W0++; v_dE_HS1++;
-                 *v_dE_W0 = _mm_mul_pd(v_hold, *v_dE_HS1);
-                v_dE_W0++; v_dE_HS1++;
-                 *v_dE_W0 = _mm_mul_pd(v_hold, *v_dE_HS1);
-                v_dE_W0++; v_dE_HS1++;
-        }
-    }
-  
 	// update W0, W1, W2, B1, B2, B3
 
-	for (int i = 0; i < N0; i++){
-         double hold[2];
-        __m128d *v_W0 = (__m128d *)W0[i];
-        __m128d *v_dE_W0 = (__m128d *)dE_W0[i];
-         __m128d v_hold = _mm_load_pd(hold);
-		for (int j = 0; j < N1; j+=10){
-           // W0[i][j] = W0[i][j] - rate * dE_W0[i][j];
-             v_hold = _mm_mul_pd(v_ratehold, *v_dE_W0);
-              *v_W0 = _mm_sub_pd(*v_W0, v_hold);
-               v_dE_W0++; v_W0++;
-               v_hold = _mm_mul_pd(v_ratehold, *v_dE_W0);
-              *v_W0 = _mm_sub_pd(*v_W0, v_hold);
-               v_dE_W0++; v_W0++;
-               v_hold = _mm_mul_pd(v_ratehold, *v_dE_W0);
-              *v_W0 = _mm_sub_pd(*v_W0, v_hold);
-               v_dE_W0++; v_W0++;
-               v_hold = _mm_mul_pd(v_ratehold, *v_dE_W0);
-              *v_W0 = _mm_sub_pd(*v_W0, v_hold);
-               v_dE_W0++; v_W0++;
-               v_hold = _mm_mul_pd(v_ratehold, *v_dE_W0);
-              *v_W0 = _mm_sub_pd(*v_W0, v_hold);
-               v_dE_W0++; v_W0++;
-        }
-    }
-   
+	for (int i = 0; i < N0; i++)
+		for (int j = 0; j < N1; j++)
+			W0[i][j] = W0[i][j] - rate * dE_W0[i][j];
 
-     //Above is replaced with SIMD SSE
-     //REDO - look at the example 
-     //B1[i] = B1[i] - rate * dE_B1[i];
-        double hold[2];
-        __m128d *v_B1 = (__m128d *)B1;
-        __m128d *v_dE_B1 = (__m128d *)dE_B1;
-         __m128d v_hold = _mm_load_pd(hold);
-        for(int i =0; i < N1; i+=10){
-            v_hold = _mm_mul_pd(v_ratehold, *v_dE_B1);
-            *v_B1 = _mm_sub_pd(*v_B1, v_hold);
-            v_B1++;
-            v_dE_B1++;
-              v_hold = _mm_mul_pd(v_ratehold, *v_dE_B1);
-            *v_B1 = _mm_sub_pd(*v_B1, v_hold);
-            v_B1++;
-            v_dE_B1++;
-              v_hold = _mm_mul_pd(v_ratehold, *v_dE_B1);
-            *v_B1 = _mm_sub_pd(*v_B1, v_hold);
-            v_B1++;
-            v_dE_B1++;
-              v_hold = _mm_mul_pd(v_ratehold, *v_dE_B1);
-            *v_B1 = _mm_sub_pd(*v_B1, v_hold);
-            v_B1++;
-            v_dE_B1++;
-              v_hold = _mm_mul_pd(v_ratehold, *v_dE_B1);
-            *v_B1 = _mm_sub_pd(*v_B1, v_hold);
-            v_B1++;
-            v_dE_B1++;
-        }
+	for (int i = 0; i < N1; i++)
+		B1[i] = B1[i] - rate * dE_B1[i];
 
-	for (int i = 0; i < N1; i++){
-        double hold[2];
-        __m128d *v_W1 = (__m128d *)W1[i];
-        __m128d *v_dE_W1 = (__m128d *)dE_W1[i];
-         __m128d v_hold = _mm_load_pd(hold);
-		for (int j = 0; j < N2; j+=10){
-			//W1[i][j] = W1[i][j] - rate * dE_W1[i][j];
-           v_hold = _mm_mul_pd(v_ratehold, *v_dE_W1);
-            *v_W1 = _mm_sub_pd(*v_W1, v_hold);
-            v_dE_W1++; v_W1++;
-             v_hold = _mm_mul_pd(v_ratehold, *v_dE_W1);
-            *v_W1 = _mm_sub_pd(*v_W1, v_hold);
-            v_dE_W1++; v_W1++;
-             v_hold = _mm_mul_pd(v_ratehold, *v_dE_W1);
-            *v_W1 = _mm_sub_pd(*v_W1, v_hold);
-            v_dE_W1++; v_W1++;
-             v_hold = _mm_mul_pd(v_ratehold, *v_dE_W1);
-            *v_W1 = _mm_sub_pd(*v_W1, v_hold);
-            v_dE_W1++; v_W1++;
-             v_hold = _mm_mul_pd(v_ratehold, *v_dE_W1);
-            *v_W1 = _mm_sub_pd(*v_W1, v_hold);
-            v_dE_W1++; v_W1++;
-        }
-    }
+	for (int i = 0; i < N1; i++)
+		for (int j = 0; j < N2; j++)
+			W1[i][j] = W1[i][j] - rate * dE_W1[i][j];
 
-   	//B2[i] = B2[i] - rate * dE_B2[i];
-       double hold1[2];
-        __m128d *v_B2 = (__m128d *)B2;
-        __m128d *v_dE_B2 = (__m128d *)dE_B2;
-         __m128d v_hold1 = _mm_load_pd(hold1);
-        for(int i =0; i < N2; i+=10){
-            v_hold1 = _mm_mul_pd(v_ratehold, *v_dE_B2);
-            *v_B2 = _mm_sub_pd(*v_B2, v_hold1);
-            v_B2++;
-            v_dE_B2++;
-             v_hold1 = _mm_mul_pd(v_ratehold, *v_dE_B2);
-            *v_B2 = _mm_sub_pd(*v_B2, v_hold1);
-            v_B2++;
-            v_dE_B2++;
-             v_hold1 = _mm_mul_pd(v_ratehold, *v_dE_B2);
-            *v_B2 = _mm_sub_pd(*v_B2, v_hold1);
-            v_B2++;
-            v_dE_B2++;
-             v_hold1 = _mm_mul_pd(v_ratehold, *v_dE_B2);
-            *v_B2 = _mm_sub_pd(*v_B2, v_hold1);
-            v_B2++;
-            v_dE_B2++;
-            v_hold1 = _mm_mul_pd(v_ratehold, *v_dE_B2);
-            *v_B2 = _mm_sub_pd(*v_B2, v_hold1);
-            v_B2++;
-            v_dE_B2++;
-        }
+	for (int i = 0; i < N2; i++)
+		B2[i] = B2[i] - rate * dE_B2[i];
 
 	for (int i = 0; i < N2; i++)
 		for (int j = 0; j < N3; j++)

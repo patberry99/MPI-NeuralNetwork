@@ -1,4 +1,4 @@
-all: Project4.x 
+all: Project4
 
-Project4.x: Project4.cpp
-	g++ -std=c++11 -mavx -o Project4.x Project4.cpp
+Project4: Project4.cpp
+	mpiCC  -std=c++11 -o Project4 Project4.cpp
