@@ -85,8 +85,17 @@ double dAlpha(double x)
 }
 
 bool FourFlag = false;
+
+int numprocs, my_id;
 int main (int argc, char *argv[]){
+
+MPI_Init(&argc,&argv);
+MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
+MPI_Comm_rank(MPI_COMM_WORLD,&my_id);
+if(my_id ==1){
+cout <<"Hit"<<endl;
 RandomizeWeights();
+}
 ParseLabelFile();
 ParsePixelFile();
 
@@ -96,6 +105,7 @@ if (argc == 2){
 else {
     train(1000000000);
 }
+   MPI_Finalize();
 }
 
 int FlipEndian(int i) 
@@ -323,9 +333,9 @@ bool CheckDigit(string response){
 
 void train(int iter)
 {
-    string response;
-    cout << "Train 10 or 4 Digits?" <<endl;
-    cin >> response;
+    string response = "4";
+   // cout << "Train 10 or 4 Digits?" <<endl;
+   // cin >> response;
        gettimeofday(&t1, NULL);
 	for (int i = 0; i< iter; i++) {
 		int ii = i % 60000;
@@ -533,3 +543,4 @@ double backward(double *O, double *Y){
 		B3[i] = B3[i] - rate * dE_B3[i];
 
 }
+
