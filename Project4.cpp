@@ -92,12 +92,43 @@ int main (int argc, char *argv[]){
 MPI_Init(&argc,&argv);
 MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
 MPI_Comm_rank(MPI_COMM_WORLD,&my_id);
-if(my_id ==1){
-cout <<"Hit"<<endl;
+cout << "Number " << my_id << " out of " <<numprocs<<endl;
+if(my_id ==0){
+cout <<"ID 0 is initializing matrices and broadcasting results to all processes"<<endl;
+//B1, B2, B3 arrays and W0 W1 W2 matrices populated. 
+//Send to all other processes 
+//MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root,  MPI_Comm comm)
 RandomizeWeights();
 }
+
+MPI_Bcast(&B1, N1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(&B2, N2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(&B3, N3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(&W0, N0*N1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(&W1, N1*N2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Bcast(&W2, N2*N3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Barrier(MPI_COMM_WORLD);
 ParseLabelFile();
 ParsePixelFile();
+if(my_id ==1){
+    cout << " I am 1"<< endl;
+    for(int i = 5; i < 8; i++){
+    cout << W0[i][i] <<endl;
+    }
+}
+if(my_id ==5){
+    cout << " I am 5"<< endl;
+      for(int i = 5; i < 8; i++){
+    cout << W0[i][i] <<endl;
+    }
+}
+if(my_id ==12){
+    cout << " I am 12"<< endl;
+      for(int i = 5; i < 8; i++){
+    cout << W0[i][i] <<endl;
+    }
+    
+}
 
 if (argc == 2){
     train(atoi(argv[1]));
@@ -389,6 +420,7 @@ if (i== CorrectLabelInput){
     }
 }
 void forward(double *input){
+    MPI_Barrier(MPI_COMM_WORLD);
  for (int i = 0; i<N0; i++){ 
 		IN[i] = input[i];}
     for (int i=0; i<N1; i++) {
