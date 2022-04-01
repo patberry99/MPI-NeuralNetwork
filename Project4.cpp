@@ -16,8 +16,9 @@
 using namespace std;
 
 #define N0  784
-#define N1  1000
-#define N2  500
+#define N1  1008
+#define N2  512
+//we will not be optimizing anything with N3, not multiple of 16 
 #define N3 10
 
 struct timeval t1, t2;
@@ -110,6 +111,7 @@ MPI_Bcast(&W2, N2*N3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 MPI_Barrier(MPI_COMM_WORLD);
 ParseLabelFile();
 ParsePixelFile();
+/*
 if(my_id ==1){
     cout << " I am 1"<< endl;
     for(int i = 5; i < 8; i++){
@@ -129,7 +131,7 @@ if(my_id ==12){
     }
     
 }
-
+*/
 if (argc == 2){
     train(atoi(argv[1]));
 } 
@@ -367,7 +369,10 @@ void train(int iter)
     string response = "4";
    // cout << "Train 10 or 4 Digits?" <<endl;
    // cin >> response;
+    if(my_id ==0){
        gettimeofday(&t1, NULL);
+    }
+
 	for (int i = 0; i< iter; i++) {
 		int ii = i % 60000;
         ParseLabelVector(ii);
@@ -398,17 +403,19 @@ void train(int iter)
             cout << i << ": " << OO[i] <<endl;
             }
             }*/
+        if(my_id ==0){
          if(i % 1000 == 0){
             OutputStatusToFile(i);
-            
             }
+        }
 	}
+     if(my_id ==0){
         gettimeofday(&t2, NULL);
       printf("NN time is %d milliseconds\n",
 	       (t2.tv_sec - t1.tv_sec)*1000 + 
 	       (t2.tv_usec - t1.tv_usec) / 1000);
-
-
+     }
+ MPI_Barrier(MPI_COMM_WORLD);
 }
 
 void PopulateY(){
@@ -420,16 +427,41 @@ if (i== CorrectLabelInput){
     }
 }
 void forward(double *input){
+    double Procholder[16];
     MPI_Barrier(MPI_COMM_WORLD);
  for (int i = 0; i<N0; i++){ 
 		IN[i] = input[i];}
     for (int i=0; i<N1; i++) {
 		HS1[i] = B1[i];
 	}
-        for (int i=0; i<N1; i++) {
-		for (int j=0; j<N0; j++)
+    //init the start and end points 
+         int start, end;
+    
+    for(int k =0; k < 16; k++){
+        if(my_id ==k){
+         start = (N0 / 16) *my_id;
+         end = (N0 / 16) * (my_id+1);
+          cout << "HIT " << my_id << " " << k <<endl;
+            }
+        }
+         MPI_Barrier(MPI_COMM_WORLD);
+      
+      //  for (int i=0; i<N1; i++) {
+          int i =0;
+		for (int j=start; j<end; j++){
 			HS1[i] += IN[j]*W0[j][i];
-	}
+             }
+             MPI_Barrier(MPI_COMM_WORLD);
+             MPI_Gather(&HS1[i],1,MPI_DOUBLE, &Procholder, 16, MPI_DOUBLE,0, MPI_COMM_WORLD);
+	   // }
+         MPI_Barrier(MPI_COMM_WORLD);
+         if(my_id == 0){
+        for(int i =0; i< 16; i++){
+            cout << Procholder[i] <<endl;
+        }
+         }
+
+    
       for (int i=0; i<N1; i++) {
 		HO1[i] = alpha(HS1[i]);
 	}
