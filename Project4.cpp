@@ -11,6 +11,8 @@
 #include <unistd.h>
 //#include <emmintrin.h> /* SSE2 */
 #include "mpi.h"
+#include <stdio.h>
+#include <string.h>
 
 
 using namespace std;
@@ -36,6 +38,8 @@ double W2[N2][N3]; //Weights of Hidden 2 Layer -> Output Layer
 double B3[N3]; //Biases of Output
 double OS[N3]; //Output Sums
 double OO[N3]; //Output Layer Final Output 
+double localHS2[N2/16];
+double localHS1[N1/16];
 
 //Helper Function Set
 int FlipEndian(int i); //File gives us Big Endian, need to flip to Intel Little Endian
@@ -89,7 +93,8 @@ bool FourFlag = false;
 
 int numprocs, my_id;
 int main (int argc, char *argv[]){
-
+memset(HS1, 0, sizeof(HS1));
+memset(localHS2, 0, sizeof(localHS2));
 MPI_Init(&argc,&argv);
 MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
 MPI_Comm_rank(MPI_COMM_WORLD,&my_id);
@@ -404,7 +409,7 @@ void train(int iter)
             }
             }*/
         if(my_id ==0){
-         if(i % 1000 == 0){
+         if(i % 500 == 0){
             OutputStatusToFile(i);
             }
         }
@@ -427,61 +432,88 @@ if (i== CorrectLabelInput){
     }
 }
 void forward(double *input){
-    double Procholder[16];
+    double * ptr1 = HS1;
+    double Procholder1[N3];
+    memset(Procholder1, 0, sizeof(Procholder1));
     MPI_Barrier(MPI_COMM_WORLD);
  for (int i = 0; i<N0; i++){ 
 		IN[i] = input[i];}
     for (int i=0; i<N1; i++) {
 		HS1[i] = B1[i];
 	}
-    //init the start and end points 
+  
+        MPI_Barrier(MPI_COMM_WORLD);
          int start, end;
-    
-    for(int k =0; k < 16; k++){
-        if(my_id ==k){
-         start = (N0 / 16) *my_id;
-         end = (N0 / 16) * (my_id+1);
-          cout << "HIT " << my_id << " " << k <<endl;
-            }
-        }
-         MPI_Barrier(MPI_COMM_WORLD);
-      
-      //  for (int i=0; i<N1; i++) {
-          int i =0;
-		for (int j=start; j<end; j++){
-			HS1[i] += IN[j]*W0[j][i];
+         start = (N1 / 16) *my_id;
+         end = (N1 / 16) * (my_id+1);
+        int l=0;
+        for (int i=start; i<end; i++) { 
+ 		for (int j=0; j<N0; j++){
+			localHS1[l] += IN[j]*W0[j][i];
              }
-             MPI_Barrier(MPI_COMM_WORLD);
-             MPI_Gather(&HS1[i],1,MPI_DOUBLE, &Procholder, 16, MPI_DOUBLE,0, MPI_COMM_WORLD);
-	   // }
-         MPI_Barrier(MPI_COMM_WORLD);
-         if(my_id == 0){
-        for(int i =0; i< 16; i++){
-            cout << Procholder[i] <<endl;
-        }
-         }
-
-    
-      for (int i=0; i<N1; i++) {
+               l++;
+          }
+       MPI_Allgather(localHS1, N2/16, MPI_DOUBLE, HS1, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);
+          
+	   
+ 
+    for (int i=0; i<N1; i++) {
 		HO1[i] = alpha(HS1[i]);
 	}
       for(int i=0; i<N2;i++){
           HS2[i] = B2[i];
       }
+      /*
       for (int i=0; i<N2; i++) {
 		for (int j=0; j<N1; j++)
 			HS2[i] += HS1[j]*W1[j][i];
-	}
+	}*/
+
+       start = (N2 / 16) *my_id;
+         end = (N2 / 16) * (my_id+1);
+        MPI_Barrier(MPI_COMM_WORLD);
+        int k=0;
+      for (int i=start; i<end; i++){
+		for (int j=0; j<N1; j++){
+			localHS2[k] += HS1[j]*W1[j][i];
+          }
+          k++;
+	    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allgather(localHS2, N2/16, MPI_DOUBLE, HS2, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);   
+
      for (int i=0; i<N2; i++) {
 		HO2[i] = alpha(HS2[i]);
 	}
     for(int i=0; i<N3;i++){
           OS[i] = B3[i];
       }
+      /*
     for (int i=0; i<N3; i++) {
 		for (int j=0; j<N2; j++)
 			OS[i] += HS2[j]*W2[j][i];
-	}
+	}*/
+
+     start = (N2 / 16) *my_id;
+        end = (N2 / 16) * (my_id+1);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        for (int i=0; i<N3; i++) {
+		    for (int j=start; j<end; j++){
+			    OS[i] += HS2[j]*W2[j][i];
+            }
+	    }
+    
+         MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Reduce(OS, Procholder1, N3, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+           if(my_id == 0){
+           for(int i =0; i < N3; i++){
+               OS[i] = Procholder1[i];
+            }
+           }
+           MPI_Bcast(OS, N3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
     for (int i=0; i<N2; i++) {
 		OO[i] = alpha(OS[i]);
 	}
