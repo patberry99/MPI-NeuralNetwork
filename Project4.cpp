@@ -538,8 +538,14 @@ double dE_HS1[N1];
 double dE_B1[N1];
 double dE_W0[N0][N1];
 
+double local_dE_HO2[N2/16];
+double local_dE_HO1[N1/16];
+double local_dE_W2[N2/16][N3];
+double local_dE_W1[N1/16][N2];
+double local_dE_W0[N0/16][N1];
 
 double backward(double *O, double *Y){
+    int start, end;
     err = 0.0;
 	for (int i = 0; i < N3; i++)
 		err += (O[i] - Y[i]) * (O[i] - Y[i]);
@@ -563,16 +569,39 @@ double backward(double *O, double *Y){
 		dE_B3[i] = dE_OS[i];
 
 	// compute dE_W2
-	for (int i = 0; i < N2; i++)
-		for (int j = 0; j < N3; j++)
-			dE_W2[i][j] = dE_OS[j] * HO2[i];
-
+        start = (N2 / 16) *my_id;
+         end = (N2 / 16) * (my_id+1);
+         int m=0;
+	for (int i = start; i < end; i++){
+		for (int j = 0; j < N3; j++){
+			local_dE_W2[m][j] = dE_OS[j] * HO2[i];
+        }
+        m++;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allgather(local_dE_W2, (N2/16)*N3, MPI_DOUBLE, dE_W2, (N2/16)*N3, MPI_DOUBLE, MPI_COMM_WORLD);   
+    
 	// compute dE_HO2 = sum_{j = 1}^{N3} dE_OS_i * W2_ij
+    start = (N2 / 16) *my_id;
+    end = (N2 / 16) * (my_id+1);
+    MPI_Barrier(MPI_COMM_WORLD);
+    int k =0;
+    for (int i = start; i < end; i++) {
+		local_dE_HO2[k] = 0;
+		for (int j = 0; j < N3; j++){
+			local_dE_HO2[k] += dE_OS[j] * W2[i][j];
+            }
+        k++;
+	}
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allgather(local_dE_HO2, N2/16, MPI_DOUBLE, dE_HO2, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);  
+    /*
 	for (int i = 0; i < N2; i++) {
 		dE_HO2[i] = 0;
 		for (int j = 0; j < N3; j++)
 			dE_HO2[i] += dE_OS[j] * W2[i][j];
-	}
+	} */
+
 	// compute dOO_OS = dAlpha(OS) = AB / cosh^2(B * OS)
 	// compute dHO2_HS2 = dAlpha(HS2) = AB / cosh^2(B * HS2)
 	for (int i = 0; i < N2; i++)
@@ -587,20 +616,42 @@ double backward(double *O, double *Y){
 		dE_B2[i] = dE_HS2[i];
 
 	// compute dE_W1
-	for (int i = 0; i < N1; i++)
-		for (int j = 0; j < N2; j++)
-			dE_W1[i][j] = dE_HS2[j] * HO1[i];
-
+     start = (N1 / 16) *my_id;
+    end = (N1 / 16) * (my_id+1);
+    int a=0;
+	for (int i = start; i < end; i++){
+		for (int j = 0; j < N2; j++){
+			local_dE_W1[a][j] = dE_HS2[j] * HO1[i];
+        }
+        a++;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allgather(local_dE_W1, (N1/16)*N2, MPI_DOUBLE, dE_W1, (N1/16)*N2, MPI_DOUBLE, MPI_COMM_WORLD);  
+   
 	// compute dH01_HS1
 	for (int i = 0; i < N1; i++)
 		dHO1_HS1[i] = dAlpha(HS1[i]);
 
 	// compute dE_HO1 = sum_{j = 1}^N2 dE_HS2 * W1_ij
+        start = (N1 / 16) *my_id;
+         end = (N1 / 16) * (my_id+1);
+        MPI_Barrier(MPI_COMM_WORLD);
+        int l=0;
+        for (int i = start; i < end; i++) {
+		local_dE_HO1[l] = 0;
+		for (int j = 0; j < N2; j++){
+			local_dE_HO1[l] += dE_HS2[j] * W1[i][j];
+            }
+            l++;
+        }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allgather(local_dE_HO1, N2/16, MPI_DOUBLE, dE_HO1, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);   
+    /*
 	for (int i = 0; i < N1; i++) {
 		dE_HO1[i] = 0;
 		for (int j = 0; j < N2; j++)
 			dE_HO1[i] += dE_HS2[j] * W1[i][j];
-	}
+	}*/
 
 	// compute dE_HS1 = dE_HO1 dot dHO1_HS1
 	for (int i = 0; i < N1; i++)
@@ -611,9 +662,17 @@ double backward(double *O, double *Y){
 		dE_B1[i] = dE_HS1[i];
 
 	// compute dE_W0
-	for (int i = 0; i < N0; i++)
-		for (int j = 0; j < N1; j++)
-			dE_W0[i][j] = dE_HS1[j] * IN[i];
+      start = (N0 / 16) *my_id;
+         end = (N0 / 16) * (my_id+1);
+         int b =0;
+	for (int i = start; i < end; i++){
+		for (int j = 0; j < N1; j++){
+			local_dE_W0[b][j] = dE_HS1[j] * IN[i];
+        }
+        b++;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allgather(local_dE_W0, (N0/16)*N1, MPI_DOUBLE, dE_W0, (N0/16)*N1, MPI_DOUBLE, MPI_COMM_WORLD);  
 
 	// update W0, W1, W2, B1, B2, B3
 

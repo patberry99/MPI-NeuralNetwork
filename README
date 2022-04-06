@@ -8,6 +8,7 @@ To test the performance improvement, we executed our neural network for 1,000 it
 
 Average Execution Time of Project 4: 
 
+
 Average Execution Time of Project 1, Part 2:
 (14749 + 14754 + 14934 + 14830 + 14725) / 5 = 14798 ~14.8 seconds 
 
@@ -18,6 +19,7 @@ Average Execution Time of Project 3 without NUMA tuning: ~ 9.5 seconds
 
 Average Execution Time of Project 3 with NUMA Tuning: ~ 8.8 seconds 
 Parameter Environment Varaibles Set: Places= threads and Bind = close 
+
 
 
 PROJECT 1 REMINDERS
