@@ -6,8 +6,7 @@ After completing the optimizations in Project 4, we fully tested the neural netw
 
 To test the performance improvement, we executed our neural network for 1,000 iterations and recorded the time in milliseconds. We used Linprog1 to run our code because the number of users are reduced compared to other Linprog servers. We took the average of 5 executions of project 1 / part 2 , project 2, project 3, and project 4:
 
-Average Execution Time of Project 4: 
-
+Average Execution Time of Project 1: 17 seconds 
 
 Average Execution Time of Project 1, Part 2:
 (14749 + 14754 + 14934 + 14830 + 14725) / 5 = 14798 ~14.8 seconds 
@@ -18,8 +17,22 @@ Average Execution Time of Project 2:
 Average Execution Time of Project 3 without NUMA tuning: ~ 9.5 seconds 
 
 Average Execution Time of Project 3 with NUMA Tuning: ~ 8.8 seconds 
-Parameter Environment Varaibles Set: Places= threads and Bind = close 
+Parameter Environment Variables Set: Places= threads and Bind = close 
 
+Average Execution Time of Project 4: 7.2 seconds 
+
+The code submitted will only test 10 digits. This is for an accurate timing so we do not skip iterations.
+If you want to test that our network can still train well and test four digits, 
+please change line 19 from response = "10" to "4". 
+
+To run the executable: mpirun -hostfile hostfile1 -np 16 ./Project4
+
+Methods to achieve our high performance and maintaining accuracy: 
+1) MPI uses one thread to populate weight randomization, then broadcasts the data to other processes
+2) Forward propagation splits the workload of nested for loops amongst the processes, followed by MPI Allgather
+3) A nested for loop in Forward propagation uses a different optimization approach, using MPI Reduce and Bcast 
+4) Backward propagation optimizes all nested for loops. MPI All gather is used twice. When populating matrices, we 
+did not need to use MPI All gather as the data was able to stay local. 
 
 
 PROJECT 1 REMINDERS
@@ -34,7 +47,7 @@ STEPS BEFORE EXECUTION
 STEPS DURING EXECUTION
 1) The executable should be run inside the nohup utility to avoid a SIGKILL to the process 
 2) There is one optional command line argument if the user wants to specify the amount of iteration. Otherwise, the NN will execute up to 100mil times. 
-3) Shortly after execution, the user will decide if they want to train the NN with 4 or 10 digits.
+
 
 
 OUTPUT OF EXECUTION

@@ -14,8 +14,9 @@
 #include <stdio.h>
 #include <string.h>
 
-
 using namespace std;
+
+string response = "4";
 
 #define N0  784
 #define N1  1008
@@ -371,10 +372,12 @@ bool CheckDigit(string response){
 
 void train(int iter)
 {
-    string response = "4";
+       double timeA;
+    //string response = "10";
    // cout << "Train 10 or 4 Digits?" <<endl;
    // cin >> response;
     if(my_id ==0){
+         timeA = MPI_Wtime();
        gettimeofday(&t1, NULL);
     }
 
@@ -415,6 +418,8 @@ void train(int iter)
         }
 	}
      if(my_id ==0){
+         timeA = MPI_Wtime() - timeA; 
+         cout << timeA << " MPI GIVEN TIME" << endl;
         gettimeofday(&t2, NULL);
       printf("NN time is %d milliseconds\n",
 	       (t2.tv_sec - t1.tv_sec)*1000 + 
@@ -435,14 +440,14 @@ void forward(double *input){
     double * ptr1 = HS1;
     double Procholder1[N3];
     memset(Procholder1, 0, sizeof(Procholder1));
-    MPI_Barrier(MPI_COMM_WORLD);
+  //  MPI_Barrier(MPI_COMM_WORLD);
  for (int i = 0; i<N0; i++){ 
 		IN[i] = input[i];}
     for (int i=0; i<N1; i++) {
 		HS1[i] = B1[i];
 	}
   
-        MPI_Barrier(MPI_COMM_WORLD);
+       // MPI_Barrier(MPI_COMM_WORLD);
          int start, end;
          start = (N1 / 16) *my_id;
          end = (N1 / 16) * (my_id+1);
@@ -471,7 +476,7 @@ void forward(double *input){
 
        start = (N2 / 16) *my_id;
          end = (N2 / 16) * (my_id+1);
-        MPI_Barrier(MPI_COMM_WORLD);
+      //  MPI_Barrier(MPI_COMM_WORLD);
         int k=0;
       for (int i=start; i<end; i++){
 		for (int j=0; j<N1; j++){
@@ -480,7 +485,7 @@ void forward(double *input){
           k++;
 	    }
     
-    MPI_Barrier(MPI_COMM_WORLD);
+   // MPI_Barrier(MPI_COMM_WORLD);
     MPI_Allgather(localHS2, N2/16, MPI_DOUBLE, HS2, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);   
 
      for (int i=0; i<N2; i++) {
@@ -497,7 +502,7 @@ void forward(double *input){
 
      start = (N2 / 16) *my_id;
         end = (N2 / 16) * (my_id+1);
-        MPI_Barrier(MPI_COMM_WORLD);
+      //  MPI_Barrier(MPI_COMM_WORLD);
 
         for (int i=0; i<N3; i++) {
 		    for (int j=start; j<end; j++){
@@ -505,7 +510,7 @@ void forward(double *input){
             }
 	    }
     
-         MPI_Barrier(MPI_COMM_WORLD);
+       //  MPI_Barrier(MPI_COMM_WORLD);
         MPI_Reduce(OS, Procholder1, N3, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
            if(my_id == 0){
            for(int i =0; i < N3; i++){
@@ -569,22 +574,27 @@ double backward(double *O, double *Y){
 		dE_B3[i] = dE_OS[i];
 
 	// compute dE_W2
+    
+    for (int i = 0; i < N2; i++)
+		for (int j = 0; j < N3; j++)
+			dE_W2[i][j] = dE_OS[j] * HO2[i];
+        /*
         start = (N2 / 16) *my_id;
          end = (N2 / 16) * (my_id+1);
-         int m=0;
+         //int m=0;
 	for (int i = start; i < end; i++){
 		for (int j = 0; j < N3; j++){
-			local_dE_W2[m][j] = dE_OS[j] * HO2[i];
+			dE_W2[i][j] = dE_OS[j] * HO2[i];
         }
-        m++;
+       // m++;
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Allgather(local_dE_W2, (N2/16)*N3, MPI_DOUBLE, dE_W2, (N2/16)*N3, MPI_DOUBLE, MPI_COMM_WORLD);   
-    
+   // MPI_Barrier(MPI_COMM_WORLD);
+    //MPI_Allgather(local_dE_W2, (N2/16)*N3, MPI_DOUBLE, dE_W2, (N2/16)*N3, MPI_DOUBLE, MPI_COMM_WORLD);   
+    */
 	// compute dE_HO2 = sum_{j = 1}^{N3} dE_OS_i * W2_ij
     start = (N2 / 16) *my_id;
     end = (N2 / 16) * (my_id+1);
-    MPI_Barrier(MPI_COMM_WORLD);
+    //MPI_Barrier(MPI_COMM_WORLD);
     int k =0;
     for (int i = start; i < end; i++) {
 		local_dE_HO2[k] = 0;
@@ -593,7 +603,7 @@ double backward(double *O, double *Y){
             }
         k++;
 	}
-    MPI_Barrier(MPI_COMM_WORLD);
+    //MPI_Barrier(MPI_COMM_WORLD);
     MPI_Allgather(local_dE_HO2, N2/16, MPI_DOUBLE, dE_HO2, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);  
     /*
 	for (int i = 0; i < N2; i++) {
@@ -616,26 +626,33 @@ double backward(double *O, double *Y){
 		dE_B2[i] = dE_HS2[i];
 
 	// compute dE_W1
+    /*
+    for (int i = 0; i < N1; i++)
+		for (int j = 0; j < N2; j++)
+			dE_W1[i][j] = dE_HS2[j] * HO1[i];
+            */
+    
      start = (N1 / 16) *my_id;
     end = (N1 / 16) * (my_id+1);
-    int a=0;
+    //int a=0;
 	for (int i = start; i < end; i++){
 		for (int j = 0; j < N2; j++){
-			local_dE_W1[a][j] = dE_HS2[j] * HO1[i];
+			dE_W1[i][j] = dE_HS2[j] * HO1[i];
         }
-        a++;
+       // a++;
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Allgather(local_dE_W1, (N1/16)*N2, MPI_DOUBLE, dE_W1, (N1/16)*N2, MPI_DOUBLE, MPI_COMM_WORLD);  
+   // MPI_Barrier(MPI_COMM_WORLD);
+    //MPI_Allgather(local_dE_W1, (N1/16)*N2, MPI_DOUBLE, dE_W1, (N1/16)*N2, MPI_DOUBLE, MPI_COMM_WORLD);  
    
 	// compute dH01_HS1
 	for (int i = 0; i < N1; i++)
 		dHO1_HS1[i] = dAlpha(HS1[i]);
 
+
 	// compute dE_HO1 = sum_{j = 1}^N2 dE_HS2 * W1_ij
         start = (N1 / 16) *my_id;
          end = (N1 / 16) * (my_id+1);
-        MPI_Barrier(MPI_COMM_WORLD);
+      //  MPI_Barrier(MPI_COMM_WORLD);
         int l=0;
         for (int i = start; i < end; i++) {
 		local_dE_HO1[l] = 0;
@@ -644,15 +661,16 @@ double backward(double *O, double *Y){
             }
             l++;
         }
-    MPI_Barrier(MPI_COMM_WORLD);
+   // MPI_Barrier(MPI_COMM_WORLD);
     MPI_Allgather(local_dE_HO1, N2/16, MPI_DOUBLE, dE_HO1, N2/16, MPI_DOUBLE, MPI_COMM_WORLD);   
+    
     /*
 	for (int i = 0; i < N1; i++) {
 		dE_HO1[i] = 0;
 		for (int j = 0; j < N2; j++)
 			dE_HO1[i] += dE_HS2[j] * W1[i][j];
-	}*/
-
+	}
+*/
 	// compute dE_HS1 = dE_HO1 dot dHO1_HS1
 	for (int i = 0; i < N1; i++)
 		dE_HS1[i] = dE_HO1[i] * dHO1_HS1[i];
@@ -662,28 +680,37 @@ double backward(double *O, double *Y){
 		dE_B1[i] = dE_HS1[i];
 
 	// compute dE_W0
+    /*
+    for (int i = 0; i < N0; i++)
+		for (int j = 0; j < N1; j++)
+			dE_W0[i][j] = dE_HS1[j] * IN[i];
+            */
+    
       start = (N0 / 16) *my_id;
          end = (N0 / 16) * (my_id+1);
-         int b =0;
+        // int b =0;
 	for (int i = start; i < end; i++){
 		for (int j = 0; j < N1; j++){
-			local_dE_W0[b][j] = dE_HS1[j] * IN[i];
+			dE_W0[i][j] = dE_HS1[j] * IN[i];
         }
-        b++;
+      //  b++;
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Allgather(local_dE_W0, (N0/16)*N1, MPI_DOUBLE, dE_W0, (N0/16)*N1, MPI_DOUBLE, MPI_COMM_WORLD);  
+   // MPI_Barrier(MPI_COMM_WORLD);
+   // MPI_Allgather(local_dE_W0, (N0/16)*N1, MPI_DOUBLE, dE_W0, (N0/16)*N1, MPI_DOUBLE, MPI_COMM_WORLD);  
 
 	// update W0, W1, W2, B1, B2, B3
-
-	for (int i = 0; i < N0; i++)
+     start = (N0 / 16) *my_id;
+         end = (N0 / 16) * (my_id+1);
+	for (int i = start; i < end; i++)
 		for (int j = 0; j < N1; j++)
 			W0[i][j] = W0[i][j] - rate * dE_W0[i][j];
 
 	for (int i = 0; i < N1; i++)
 		B1[i] = B1[i] - rate * dE_B1[i];
 
-	for (int i = 0; i < N1; i++)
+     start = (N1 / 16) *my_id;
+    end = (N1 / 16) * (my_id+1);
+	for (int i = start; i < end; i++)
 		for (int j = 0; j < N2; j++)
 			W1[i][j] = W1[i][j] - rate * dE_W1[i][j];
 
